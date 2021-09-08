@@ -173,7 +173,7 @@ class MissionManager:
       return self._episode_manager_nums.copy()
   
   def reset_vehicle(self, vname, success=False):
-    self._vresets.appedn((vname, success))
+    self._vresets.append((vname, success))
 
   def close(self):
     if self._thread is not None:
