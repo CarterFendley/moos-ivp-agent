@@ -11,6 +11,11 @@ set MODE     = RETURN_BASE {
   (ACTION != AGENT) and ((HAS_FLAG = true) or (TAGGED = true))
 } PLAY
 
+set MODE     = AGENT_CONTROL {
+  MODE       = ACTIVE:PLAY
+  (ACTION = AGENT) and (TAGGED = false)
+}
+
 set MODE     = ATTACKING {
   MODE       = ACTIVE:PLAY
   (ACTION = ATTACK) and (TAGGED = false)
@@ -31,12 +36,22 @@ set MODE     = DEFENDING {
   (ACTION = DEFEND) and (TAGGED = false)
 }
 
+set MODE     = LOITER1 {
+  MODE       = ACTIVE:PLAY
+  (ACTION = LOITER1) and (TAGGED = false)
+}
+
+set MODE     = LOITER2 {
+  MODE       = ACTIVE:PLAY
+  (ACTION = LOITER2) and (TAGGED = false)
+}
+
 set MODE     = STATIONNING {
   MODE       = ACTIVE:PLAY
   ACTION     = STATION
 }
 
-#ifdef ROLE agent
+#ifdef NO_AGENT false
   //#############################################################################
   Behavior = BHV_Agent
   {
@@ -44,11 +59,12 @@ set MODE     = STATIONNING {
     pwt  = 100
     perpetual = true
 
-    condition = MODE == ACTIVE
+    condition = MODE == AGENT_CONTROL
 
     sub_var = TAGGED
     sub_var = HAS_FLAG
 
+    // Watch the drones
     sub_vehicle = drone_21
     sub_vehicle = drone_22
     sub_vehicle = drone_23
@@ -56,6 +72,7 @@ set MODE     = STATIONNING {
     sub_vehicle = drone_25
   }
 #endif
+
 //#############################################################################
 Behavior = BHV_Waypoint
 {
@@ -88,6 +105,36 @@ Behavior = BHV_Loiter
 
   polygon                 = radial:: x=0,y=0,radius=10,pts=8 // example
   center_assign           = $(MY_FLAG)
+}
+
+//#############################################################################
+Behavior = BHV_Loiter
+{
+  name                    = loiter_one
+  pwt                     = 100
+  condition               = MODE == LOITER1
+  runflag                 = BOT_DIALOG_STATUS=Loiter2
+  updates                 = LOITER1_UPDATES
+
+  speed                   = 5
+
+  polygon                 = radial:: x=0,y=0,radius=10,pts=8 // example
+  center_assign           = $(LOITER1)
+}
+
+//#############################################################################
+Behavior = BHV_Loiter
+{
+  name                    = loiter_two
+  pwt                     = 100
+  condition               = MODE == LOITER2
+  runflag                 = BOT_DIALOG_STATUS=Loiter2
+  updates                 = LOITER2_UPDATES
+
+  speed                   = 5
+
+  polygon                 = radial:: x=0,y=0,radius=10,pts=8 // example
+  center_assign           = $(LOITER2)
 }
 
 //#############################################################################

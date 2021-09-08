@@ -18,22 +18,33 @@ OWN_FLAG=""
 ENEMY_FLAG=""
 GRABR_POS=""
 GRABL_POS=""
+LOITER1=""
+LOITER2=""
+
 BEHAVIOR="DEFEND"
 RED_FLAG="50,-24"
 BLUE_FLAG="-52,-70"
+
+RED_LOITER1="30,-60"
+RED_LOITER2="14,-22"
+
+BLUE_LOITER1="-28,-42"
+BLUE_LOITER2="-12,-79"
 
 # MOOS-IvP-Agent specific
 ROLE=""
 ID=""
 COLOR="green"
 LOGGING="no"
+NO_AGENT="false"
+SCENARIO="attack"
 
 function help(){
     echo ""
     echo "USAGE: $0 <team> <role> <id> [SWITCHES]"
 
     echo ""
-    echo "POSSIBLE ROLES:"
+    echo "POSSIBLE TEAMS:"
     echo "  red,          r  : Red team."
     echo "  blue,         b  : Blue team."
 
@@ -48,6 +59,7 @@ function help(){
 
     echo ""
     echo "POSSIBLE SWITCHES:"
+    echo "  --no_agent            : No BHV_Agent "
     echo "  --just_build, -J      : Just build targ files."
     echo "  --help,       -H      : Display this message."
     echo "  --behavior=<behavior> : Set the vehicle's color"
@@ -82,6 +94,9 @@ if [ "${VTEAM}" = "red" ]; then
 
     GRABR_POS="-46,-42"
     GRABL_POS="-29,-83"
+
+    LOITER1=$RED_LOITER1
+    LOITER2=$RED_LOITER2
 elif [ "${VTEAM}" = "blue" ]; then
     MY_FLAG=$BLUE_FLAG
     START_POS="$BLUE_FLAG,60"
@@ -89,6 +104,9 @@ elif [ "${VTEAM}" = "blue" ]; then
 
     GRABR_POS="42,-55"
     GRABL_POS="19,-11"
+
+    LOITER1=$BLUE_LOITER1
+    LOITER2=$BLUE_LOITER2
 fi
 
 # Handle role assigment
@@ -100,7 +118,7 @@ case "$2" in
         ;;
     drone|d)
         ROLE="drone"
-        echo "Vehicle set as a drone"
+        echo "Vehicle set as a drone."
         ;;
     *)
         echo "!!! ERROR: expected role assignment got: $2 !!!"
@@ -119,8 +137,6 @@ fi
 # Set VNAME based on role and id
 VNAME="${ROLE}_${ID}"
 
-echo "hi"
-
 for arg in "${@:4}"; do
     if [ "${arg}" = "--help" -o "${arg}" = "-H" ]; then
         help
@@ -130,12 +146,16 @@ for arg in "${@:4}"; do
     elif [ "${arg}" = "--just_build" -o "${arg}" = "-J" ] ; then
         JUST_BUILD="yes"
         echo "Just building files; no vehicle launch."
+    elif [ "${arg}" = "--no_agent" ]; then
+        NO_AGENT="true"
     elif [ "${arg}" = "--log" ] ; then
         LOGGING="yes"
     elif [ "${arg:0:8}" = "--color=" ]; then
         COLOR="${arg#--color=*}"
     elif [ "${arg:0:11}" = "--behavior=" ]; then
         BEHAVIOR="${arg#--behavior=*}"
+    elif [ "${arg:0:11}" = "--scenario=" ]; then
+        SCENARIO="${arg#--scenario=*}"
     else
         echo "Undefined switch:" $arg
         help
@@ -160,6 +180,7 @@ nsplug meta_heron.moos targ_${VNAME}.moos -f \
     COLOR=$COLOR                 \
     LOGGING=$LOGGING             \
     ROLE=$ROLE                   \
+    SCENARIO=$SCENARIO           \
 
 echo "Assembling BHV file targ_${VNAME}.bhv"
 nsplug meta_heron.bhv targ_${VNAME}.bhv -f  \
@@ -170,6 +191,9 @@ nsplug meta_heron.bhv targ_${VNAME}.bhv -f  \
         ENEMY_FLAG=$ENEMY_FLAG              \
         GRABR_POS=$GRABR_POS                \
         GRABL_POS=$GRABL_POS                \
+        LOITER1=$LOITER1                    \
+        LOITER2=$LOITER2                    \
+        NO_AGENT=$NO_AGENT                  \
 	    BEHAVIOR=$BEHAVIOR
 
 

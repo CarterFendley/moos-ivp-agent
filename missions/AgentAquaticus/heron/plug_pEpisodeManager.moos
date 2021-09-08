@@ -12,16 +12,42 @@ ProcessConfig = pEpisodeManager
 
   start_post = var=DEPLOY,val=true
 
-  //end_success_condition = (HAS_FLAG = true)
+#ifdef SCENARIO attack
+  end_success_condition = (GOAL_SIGNAL = true)
   end_failure_condition = (TAGGED = true)
 
+  reset_post = var=GOAL_SIGNAL,val=false
   reset_post = var=HAS_FLAG,val=false
   reset_post = var=UNTAG_REQUEST,val=vname=$(VNAME)
   reset_post = var=TAGGED,val=false
 
+#elseifdef SCENARIO defense
+  // NOTES: 
+  // 1) For now, the python should trigger failure when
+  // the paired drone scoring as well as being tagged (below)
+  //
+  // 2) Python should also trigger the paired drone to
+  // reset via EPISODE_MGR_CTRL=type=reset
+  //
+  // Reason: Don't want to specify pairings in MOOS-IvP. This
+  // might change.
+  end_success_condition = (TAGGED_SIGNAL = true)
+  end_failure_condition = (TAGGED = true)
+
+  reset_post = var=TAGGED_SIGNAL,val=false
+  reset_post = var=HAS_FLAG,val=false
+  reset_post = var=UNTAG_REQUEST,val=vname=$(VNAME)
+  reset_post = var=TAGGED,val=false  
+#endif
+
+#ifdef VTEAM red
+  reset_poly = pts={ 56,16 : -15,-17 : 17,-83 : 82,-56 }
+#elseifdef VTEAM blue
+  reset_poly = pts={ -15,-17 : -83,-49 : -53,-114 : 17,-83 }
+#else
+  reset_pos = $(START_POS)
+#endif
+
   pause_post = var=DEPLOY,val=false
-
-
-  RESET_POS = $(START_POS)
   VNAME     = $(VNAME)
 }

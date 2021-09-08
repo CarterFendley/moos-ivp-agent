@@ -10,6 +10,7 @@
 #include "ACTable.h"
 #include "EpisodeManager.h"
 #include <cmath>
+#include "RandPairPoly.h"
 
 using namespace std;
 
@@ -33,6 +34,9 @@ EpisodeManager::EpisodeManager()
   m_failure_cnt = 0;
 
   m_max_duration = -1;
+
+  m_reset_poly = "";
+  m_reset_heading = "";
 }
 
 //---------------------------------------------------------
@@ -181,7 +185,7 @@ bool EpisodeManager::Iterate()
     }
   }else if(m_current_state == RESETING){
     Notify("EPISODE_MGR_STATE", "RESETING");
-    if(std::abs(m_nav_x-m_reset_x) < 1 && std::abs(m_nav_y-m_reset_y) < 1){
+    if(std::abs(m_nav_x-m_last_reset_x) < 1 && std::abs(m_nav_y-m_last_reset_y) < 1){
       postPosts(m_reset_posts);
       Notify("MOOS_MANUAL_OVERRIDE", "false");
 
@@ -284,14 +288,13 @@ bool EpisodeManager::OnStartUp()
       }
 
       handled = true;
+    }else if(param == "reset_poly"){
+      m_reset_poly = value;
+      handled = true;
     }else if(param == "reset_pos") {
       m_reset_x = std::atof(biteStringX(value, ',').c_str());
       m_reset_y = std::atof(biteStringX(value, ',').c_str());
       m_reset_heading = biteStringX(value, ',');
-
-      if(!resetPosValid()){
-        reportConfigWarning("Invalid START_POS config");
-      }
 
       handled = true;
     }
@@ -356,11 +359,6 @@ void EpisodeManager::registerVariables()
     Register(all_vars[i], 0);
     reportEvent("Regested for end condition var: "+all_vars[i]);
   }
-}
-
-bool EpisodeManager::resetPosValid(){
-  //TODO: Fix this
-  return m_reset_heading != "";
 }
 
 //-----------------------------------------------------------
@@ -448,20 +446,49 @@ void EpisodeManager::endEpisode(bool success){
 }
 
 void EpisodeManager::resetVehicle(){
-  if(!resetPosValid()){
-    reportRunWarning("Cannot reset vehicle due to invalid reset position.");
-    return;
-  }
-
   m_previous_state = m_current_state;
   m_current_state = RESETING;
 
-  std::string reset_string = "x="+doubleToString(m_reset_x);
-  reset_string += ",y="+doubleToString(m_reset_y);
-  reset_string += ",heading="+m_reset_heading;
+  // Get reset position ethier randomly or from config
+  std::string reset_x = "";
+  std::string reset_y = "";
+  std::string reset_heading = "";
+  
+  if(m_reset_poly != ""){
+    RandPairPoly rand_poly;
+    
+    if(!rand_poly.setParam("poly", m_reset_poly)){
+      reportRunWarning("Invalid reset poly: "+m_reset_poly);
+      return;
+    }
+
+    rand_poly.reset();
+    reset_x = rand_poly.getStringValue1();
+    reset_y = rand_poly.getStringValue2();
+    reset_heading = doubleToString((rand() / RAND_MAX) * 360);
+  }
+  if(m_reset_heading != ""){
+    if(reset_x != ""){
+      reportRunWarning("Both reset_pos and reset_poly set, using reset_poly");
+    }else{
+      reset_x = doubleToString(m_reset_x);
+      reset_y = doubleToString(m_reset_y);
+      reset_heading = m_reset_heading;
+    }
+  }
+
+
+  std::string reset_string = "x="+reset_x;
+  reset_string += ",y="+reset_y;
+  reset_string += ",heading="+reset_heading;
   reset_string += ",speed=0,depth=0";
 
+  // Store last reset pos
+  m_last_reset_x = atof(reset_x.c_str());
+  m_last_reset_y = atof(reset_y.c_str());
+
   Notify("USM_RESET", reset_string);
+  reportEvent("RESET: "+reset_string);
 }
 
 void EpisodeManager::postPosts(std::vector<VarDataPair> posts){

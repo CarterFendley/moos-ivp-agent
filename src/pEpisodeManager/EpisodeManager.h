@@ -45,6 +45,7 @@ class EpisodeManager : public AppCastingMOOSApp
    //TODO: Move initalization to the constructor
    std::string m_vname = "";
 
+   std::string m_reset_poly = "";
    double m_reset_x;
    double m_reset_y;
    std::string m_reset_heading = "";
@@ -75,6 +76,8 @@ class EpisodeManager : public AppCastingMOOSApp
    double m_nav_y;
    std::string m_helm_state;
 
+   double m_last_reset_x;
+   double m_last_reset_y;
 
    double m_episode_start;
 };
