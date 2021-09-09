@@ -344,7 +344,7 @@ if __name__ == '__main__':
     train(args, config)
   else:
     wandb.login(key=WANDB_KEY)
-    with wandb.init(project='mivp_agent_qtable', config=config):
+    with wandb.init(project='mivp_agent_dqn', config=config):
       config = wandb.config
       args.save_dir = os.path.join(SAVE_DIR, f'{str(round(time.time()))}_{wandb.run.name}')
       train(args, config)
