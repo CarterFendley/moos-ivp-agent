@@ -173,7 +173,9 @@ class MissionManager:
       return self._episode_manager_nums.copy()
   
   def reset_vehicle(self, vname, success=False):
-    self._vresets.append((vname, success))
+    raise NotImplementedError('Needs change of bridge protocol')
+    # NOTE: Will cause violation of the 'State should only come one at a time' rule
+    #self._vresets.put((vname, success))
 
   def close(self):
     if self._thread is not None:
