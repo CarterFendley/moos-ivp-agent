@@ -1,5 +1,4 @@
 FROM moosivp/moos-ivp:r9767-gui
-LABEL maintainer = Michael Misha Novitzky <michael.novitzky@westpoint.edu>
 
 ENV MOOS="moos-ivp-aquaticus"
 ENV PATH="/home/moos/${MOOS}/bin:${PATH}"
@@ -15,12 +14,16 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y sudo pyt
 RUN apt-get install -y vim emacs-nox tmux git
 # Add debuging utilities
 RUN apt-get install -y gdb psmisc 
-# Legacy plearn stuff
-RUN pip3 install --no-cache-dir numpy matplotlib 'tensorflow==1.5' 'keras==2.0.8' colorama 'h5py==2.10.0'
+# Install general python stuff
+RUN pip3 install numpy matplotlib tqdm wandb==0.11.2 timeout-decorator
 # Matplotlib X11 forwarding with GTK
 ENV DEBIAN_FRONTEND="noninteractive"
 RUN apt-get install -y python3-tk
-RUN pip3 install tqdm wandb==0.11.2 timeout-decorator
+
+# pLearn Example
+RUN pip3 install --no-cache-dir 'tensorflow==1.5' 'keras==2.0.8' 'h5py==2.10.0'
+# DQN Example
+#RUN pip3 install --no-cache-dir torch
 
 USER moos
 
