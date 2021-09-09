@@ -27,13 +27,15 @@ class DQN(nn.Module):
       nn.ReLU(),
       nn.Linear(64, n_actions)
     )
+
+    print(self.model)
   
   def forward(self, x):
     return self.model(x)
 
 Transition = namedtuple(
   'Transition',
-  ('state', 'action', 'next_state', 'reward', 'done')
+  ('state', 'action', 'next_state', 'reward')
 )
 
 class ReplayMemory:

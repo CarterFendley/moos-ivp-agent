@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 import time
+
+from numpy import dtype
 import wandb
 import argparse
 from tqdm import tqdm
@@ -22,8 +24,8 @@ from util.state import dist
 
 from config import EPISODES, BATCH_SIZE, TARGET_UPDATE, MEMORY_SIZE
 from config import GAMMA, LR
-from config import EPS_START, EPS_END, EPS_DECAY
-from config import REWARD_STEP, REWARD_SUCCESS, REWARD_FAILURE
+from config import EPS_START, EPS_DECAY_AMT
+from config import REWARD_STEP, REWARD_SUCCESS, REWARD_FAILURE, REWARD_ACTION_CHANGE
 from config import ACTIONS
 from config import SAVE_DIR
 
@@ -41,7 +43,7 @@ for agent in VEHICLE_PAIRING:
   EXPECTED_VEHICLES.append(VEHICLE_PAIRING[agent])
 
 # TODO: Are these reasonable values? 
-COLLECT_FOR = 50 # Units: Episodes
+COLLECT_FOR = 25 # Units: Episodes
 TRAIN_FOR = 50 # Units: btaches 
 
 class AgentData:
@@ -59,6 +61,7 @@ class AgentData:
     self.last_episode_num = None # Episode transitions
     self.last_state = None       # State transitions
     self.current_action = None 
+    self.last_action = None
 
     # For debugging / output
     self.min_dist = None
@@ -72,19 +75,21 @@ class AgentData:
 
     self.last_state = None
     self.current_action = None
+    self.last_action = None
 
     self.min_dist = None
     self.episode_reward = 0
     self.last_MOOS_time = None
     self.MOOS_deltas.clear()
+    self.times_switched = 0 
 
 
 # References: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 def train(args, config):
   # ---------------------------------------
   # Part 1: Setup model
-  policy_net = DQN(6, 2)
-  target_net = DQN(6, 2)
+  policy_net = DQN(7, 2)
+  target_net = DQN(7, 2)
   target_net.load_state_dict(policy_net.state_dict())
   target_net.eval() # Not 100% on purpose, but references DQN has BatchNorm, which I am not using https://stackoverflow.com/questions/60018578/what-does-model-eval-do-in-pytorch
   
@@ -115,7 +120,7 @@ def train(args, config):
       # Part 3: Setup simulation & data structures needed to collect some data
 
       # While all vehicle's pEpisodeManager are not PAUSED
-      print('Waiting for pEpisodeManager to enter PAUSED state...')
+      tqdm.write('\nWaiting for pEpisodeManager to enter PAUSED state...')
       while not all(mgr.episode_state(vname) == 'PAUSED' for vname in agents):
         msg = mgr.get_message()
         if mgr.episode_state(msg.vname) != 'PAUSED':
@@ -133,6 +138,12 @@ def train(args, config):
       # ---------------------------------------
       # Part 4: Actually collect data
       collected = 0
+      success_count = 0
+      transition_count = 0
+      action_changes = 0
+      durations = [] # TODO: Just .clear() these
+      deltas = []
+
       while collected < COLLECT_FOR:
         msg = mgr.get_message()
 
@@ -150,7 +161,7 @@ def train(args, config):
 
         # Update debugging MOOS time
         if agent.last_MOOS_time is not None:
-          agent.MOOS_deltas.append(msg.state['MOOS_TIME']-agent.last_MOOS_time)
+          deltas.append(msg.state['MOOS_TIME']-agent.last_MOOS_time)
         agent.last_MOOS_time = msg.state['MOOS_TIME']
       
         # Construct model readable tensor
@@ -177,33 +188,23 @@ def train(args, config):
           reward = config['reward_failure']
           if msg.episode_report['SUCCESS']:
             reward = config['reward_success']
+            success_count += 1
 
           memory.push(
             agent.last_state,
             agent.current_action,
-            model_state,
+            None,
             reward,
-            True # Signals terminal state, so no look ahead
           )
 
-          # Construct report
-          report = {
-            'episode_count': episode_count,
-            'epsilon': round(epsilon, 3),
+          # Log info
+          durations.append(msg.episode_report['DURATION'])
+          episode_report = {
             'duration': round(msg.episode_report['DURATION'], 2),
             'success': msg.episode_report['SUCCESS'],
           }
-
-          if len(agent.MOOS_deltas) != 0:
-            report['avg_delta'] = round(sum(agent.MOOS_deltas)/len(agent.MOOS_deltas), 2)
-          else:
-            report['avg_delta'] = 0.0
-
-          # Log the report
-          if not args.no_wandb:
-            wandb.log(report)
           tqdm.write(f'[{msg.vname}] ', end='')
-          tqdm.write(', '.join([f'{k}: {report[k]}' for k in report]))
+          tqdm.write(', '.join([f'{k}: {episode_report[k]}' for k in episode_report]))
 
           # Update epsilon
           if epsilon > 0:
@@ -212,57 +213,83 @@ def train(args, config):
           # Reset agent data
           agent.new_episode(msg.episode_report['NUM'])
 
-          # Manually reset the enemy drone vehicle 
-          mgr.reset_vehicle(agent.enemy)
-
           # Update counters
+          transition_count +=1
           episode_count += 1
           collected += 1
           progress_bar.update(1)
 
-        # Add a transition to memory
+        # Add a previous transition to memory
         if agent.last_state != None:
+          reward = config['reward_step']
+          if agent.last_action != agent.current_action:
+            reward = config['reward_action_change']
+            action_changes += 1
+
           memory.push(
             agent.last_state,
             agent.current_action,
             model_state,
-            config['reward_step'],
-            False # Signals non-terminal state
+            reward
           )
+
+          transition_count += 1
         agent.last_state = model_state
 
         # Get a new action
+        agent.last_action = agent.current_action
         agent.current_action = model.select_action(model_state, epsilon=epsilon)
 
         # Preform the action
         msg.act(ACTIONS[agent.current_action])
       
       # ---------------------------------------
+      # Part 4: Construct report for previous collection session
+      report = {
+        'episode_count': episode_count,
+        'epsilon': round(epsilon, 3),
+        'prob_success': round(success_count/COLLECT_FOR, 2),
+        'prob_action': round(action_changes / transition_count, 2),
+        'avg_duration': round(sum(durations)/len(durations), 2),
+        'avg_deltas': round(sum(deltas)/len(deltas), 2)
+      }
+
+      # Log the report
+      if not args.no_wandb:
+        wandb.log(report)
+      tqdm.write(', '.join([f'{k}: {report[k]}' for k in report]))
+
+
+      # ---------------------------------------
       # Part 4: Fit the model
       # Reference: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html#training-loop
       batches = 0
+      fit_bar = tqdm(total=TRAIN_FOR, desc='Fitting')
+      tqdm.write(f'Batch size: {BATCH_SIZE}, Batches: {TRAIN_FOR}, Will Sample: {BATCH_SIZE*TRAIN_FOR}, Memory size: {len(memory)}')
       while batches < TRAIN_FOR:
         if len(memory) < BATCH_SIZE:
           break
-        
+
         # Get a batch
         transitions = memory.sample(BATCH_SIZE)
         batch = Transition(*zip(*transitions)) # See Transition definition & https://stackoverflow.com/a/19343/3343043
 
         # Get V(s_{t+1}) expected value for next states
-        non_terminal_mask = torch.tensor(tuple(map(lambda s: s is not False, batch.done)), dtype=torch.bool)
+        non_terminal_mask = torch.tensor(tuple(map(lambda s: s is not None, batch.next_state)), dtype=torch.bool)
+
         non_terminal_next_states = torch.cat([s for s in batch.next_state if s is not None])
 
         next_state_values = torch.zeros(BATCH_SIZE) # Default will be zero for terminal states
         next_state_values[non_terminal_mask] = target_net(non_terminal_next_states).max(1)[0].detach() # Detach grad
 
         # Get Q value to fit
-        rewards = torch.cat(batch.reward)
-        Q_target = (GAMMA * next_state_values) + reward
+        rewards = torch.cat([torch.Tensor([r]) for r in batch.reward])
+        Q_target = (GAMMA * next_state_values) + rewards
 
         # Get Q prediction
         states = torch.cat(batch.state)
-        actions = torch.cat(batch.action)
+        # NOTE: Double [[a]] to match dimensionality requirement of gather()
+        actions = torch.cat([torch.tensor([[a]], dtype=torch.long) for a in batch.action])
 
         Q_prediction = policy_net(states).gather(1, actions) # Get only actions we are interested in
 
@@ -275,6 +302,10 @@ def train(args, config):
         loss.backward()
         nn.utils.clip_grad_norm_(policy_net.parameters(), 1)
         optimizer.step()
+
+        batches += 1
+        fit_bar.update(1)
+      fit_bar.close()
     
     # Update target after training for x amount
     target_net.load_state_dict(policy_net.state_dict())
@@ -300,13 +331,13 @@ if __name__ == '__main__':
     'gamma': GAMMA,
     'episodes': EPISODES,
     'eps_start': EPS_START,
-    'eps_end': EPS_END,
-    'eps_decay': EPS_DECAY,
+    'eps_decay': EPS_DECAY_AMT,
     'actions': ACTIONS,
     'action_space_size': len(ACTIONS),
     'reward_success': REWARD_SUCCESS,
     'reward_failure': REWARD_FAILURE,
     'reward_step': REWARD_STEP,
+    'reward_action_change': REWARD_ACTION_CHANGE,
   }
 
   if args.no_wandb:
