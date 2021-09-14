@@ -34,8 +34,8 @@ VEHICLE_PAIRING = {
   'agent_11': 'drone_21',
   'agent_12': 'drone_22',
   'agent_13': 'drone_23',
-  #'agent_14': 'drone_24',
-  #'agent_15': 'drone_25'
+  'agent_14': 'drone_24',
+  'agent_15': 'drone_25'
 }
 EXPECTED_VEHICLES = []
 for agent in VEHICLE_PAIRING:
