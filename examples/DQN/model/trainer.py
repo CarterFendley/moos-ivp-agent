@@ -146,6 +146,7 @@ def train(args, config):
       rewards = []
       durations = [] # TODO: Just .clear() these
       deltas = []
+      action_count = [0]*args['action_space_size']
 
       while collected < COLLECT_FOR:
         msg = mgr.get_message()
@@ -249,6 +250,7 @@ def train(args, config):
 
         # Preform the action
         msg.act(ACTIONS[agent.current_action])
+        action_count[agent.current_action] += 1
       
       # ---------------------------------------
       # Part 4: Construct report for previous collection session
@@ -259,11 +261,14 @@ def train(args, config):
         'prob_action': round(action_changes / transition_count, 2),
         'avg_reward': round(sum(rewards)/len(rewards)),
         'avg_duration': round(sum(durations)/len(durations), 2),
-        'avg_deltas': round(sum(deltas)/len(deltas), 2)
+        'avg_deltas': round(sum(deltas)/len(deltas), 2),
+        'prob_loiter1': round(action_count[0]/sum(action_count)),
+        'prob_loiter2': round(action_count[1]/sum(action_count)),
       }
 
       # Log the report
       if not args.no_wandb:
+
         wandb.log(report)
       tqdm.write(', '.join([f'{k}: {report[k]}' for k in report]))
 
