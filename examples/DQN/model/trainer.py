@@ -34,8 +34,8 @@ VEHICLE_PAIRING = {
   'agent_11': 'drone_21',
   'agent_12': 'drone_22',
   'agent_13': 'drone_23',
-  'agent_14': 'drone_24',
-  'agent_15': 'drone_25'
+  #'agent_14': 'drone_24',
+  #'agent_15': 'drone_25'
 }
 EXPECTED_VEHICLES = []
 for agent in VEHICLE_PAIRING:
@@ -146,7 +146,7 @@ def train(args, config):
       rewards = []
       durations = [] # TODO: Just .clear() these
       deltas = []
-      action_count = [0]*args['action_space_size']
+      action_count = [0]*config['action_space_size']
 
       while collected < COLLECT_FOR:
         msg = mgr.get_message()
@@ -262,8 +262,8 @@ def train(args, config):
         'avg_reward': round(sum(rewards)/len(rewards)),
         'avg_duration': round(sum(durations)/len(durations), 2),
         'avg_deltas': round(sum(deltas)/len(deltas), 2),
-        'prob_loiter1': round(action_count[0]/sum(action_count)),
-        'prob_loiter2': round(action_count[1]/sum(action_count)),
+        'prob_loiter1': round(action_count[0]/sum(action_count), 2),
+        'prob_loiter2': round(action_count[1]/sum(action_count), 2),
       }
 
       # Log the report
