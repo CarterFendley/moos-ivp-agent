@@ -137,10 +137,13 @@ def train(args, config):
       
       # ---------------------------------------
       # Part 4: Actually collect data
+
+      # Setup statistics for collection
       collected = 0
       success_count = 0
       transition_count = 0
       action_changes = 0
+      rewards = []
       durations = [] # TODO: Just .clear() these
       deltas = []
 
@@ -189,6 +192,7 @@ def train(args, config):
           if msg.episode_report['SUCCESS']:
             reward = config['reward_success']
             success_count += 1
+          agent.episode_reward += reward
 
           memory.push(
             agent.last_state,
@@ -198,8 +202,10 @@ def train(args, config):
           )
 
           # Log info
+          rewards.append(agent.episode_reward)
           durations.append(msg.episode_report['DURATION'])
           episode_report = {
+            'reward': agent.episode_reward,
             'duration': round(msg.episode_report['DURATION'], 2),
             'success': msg.episode_report['SUCCESS'],
           }
@@ -233,6 +239,7 @@ def train(args, config):
             reward
           )
 
+          agent.episode_reward += reward
           transition_count += 1
         agent.last_state = model_state
 
@@ -250,6 +257,7 @@ def train(args, config):
         'epsilon': round(epsilon, 3),
         'prob_success': round(success_count/COLLECT_FOR, 2),
         'prob_action': round(action_changes / transition_count, 2),
+        'avg_reward': round(sum(rewards)/len(rewards)),
         'avg_duration': round(sum(durations)/len(durations), 2),
         'avg_deltas': round(sum(deltas)/len(deltas), 2)
       }
