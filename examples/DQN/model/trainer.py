@@ -34,8 +34,8 @@ VEHICLE_PAIRING = {
   'agent_11': 'drone_21',
   'agent_12': 'drone_22',
   'agent_13': 'drone_23',
-  'agent_14': 'drone_24',
-  'agent_15': 'drone_25'
+  #'agent_14': 'drone_24',
+  #'agent_15': 'drone_25'
 }
 EXPECTED_VEHICLES = []
 for agent in VEHICLE_PAIRING:
@@ -96,6 +96,9 @@ def train(args, config):
   model = Agent(policy_net)
   optimizer = optim.Adam(policy_net.parameters(), lr=config['lr'])
   memory = ReplayMemory(MEMORY_SIZE)
+
+  if not args.no_wandb:
+    wandb.watch(policy_net, log_freq=TRAIN_FOR)
   
   vehicles = {}
   with MissionManager() as mgr:
@@ -309,6 +312,8 @@ def train(args, config):
         # Compute loss
         criterion = nn.SmoothL1Loss()
         loss = criterion(Q_prediction, Q_target.unsqueeze(1))
+        if not args.no_wandb:
+          wandb.log({'loss': loss})
 
         # Optimize the model
         optimizer.zero_grad()
