@@ -60,7 +60,7 @@ class AgentData:
     self.agent_episode_count = 0
     self.last_episode_num = None # Episode transitions
     self.last_state = None       # State transitions
-    self.current_action = None 
+    self.current_action = 0 # Not none, b/c model won't accept as input 
     self.last_action = None
 
     # For debugging / output
@@ -74,7 +74,7 @@ class AgentData:
     self.agent_episode_count += 1
 
     self.last_state = None
-    self.current_action = None
+    self.current_action = 0
     self.last_action = None
 
     self.min_dist = None
@@ -88,8 +88,8 @@ class AgentData:
 def train(args, config):
   # ---------------------------------------
   # Part 1: Setup model
-  policy_net = DQN(7, 2)
-  target_net = DQN(7, 2)
+  policy_net = DQN(8, 2)
+  target_net = DQN(8, 2)
   target_net.load_state_dict(policy_net.state_dict())
   target_net.eval() # Not 100% on purpose, but references DQN has BatchNorm, which I am not using https://stackoverflow.com/questions/60018578/what-does-model-eval-do-in-pytorch
   
@@ -183,7 +183,8 @@ def train(args, config):
           msg.state['NODE_REPORTS'][agent.enemy]['NAV_X'],
           msg.state['NODE_REPORTS'][agent.enemy]['NAV_Y'],
           msg.state['NODE_REPORTS'][agent.enemy]['NAV_HEADING'],
-          dist_between # Don't want the net to have to learn a dist function
+          dist_between, # Don't want the net to have to learn a dist function
+          agent.current_action, # b/c we have a change action penalty
         ),])
 
         # Catch episode endings
