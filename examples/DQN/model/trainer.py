@@ -98,7 +98,7 @@ def train(args, config):
   memory = ReplayMemory(MEMORY_SIZE)
 
   if not args.no_wandb:
-    wandb.watch(policy_net, log_freq=TRAIN_FOR)
+    wandb.watch(policy_net, log_freq=TRAIN_FOR, log_graph=True)
   
   vehicles = {}
   with MissionManager() as mgr:

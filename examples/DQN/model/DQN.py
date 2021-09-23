@@ -19,13 +19,13 @@ class DQN(nn.Module):
     self.n_actions = n_actions
 
     self.model = nn.Sequential(
-      nn.Linear(state_size, 256),
+      nn.Linear(state_size, 16),
       nn.ReLU(),
-      nn.Linear(256, 128),
+      nn.Linear(16, 8),
       nn.ReLU(),
-      nn.Linear(128, 64),
+      nn.Linear(8, 4),
       nn.ReLU(),
-      nn.Linear(64, n_actions)
+      nn.Linear(4, n_actions)
     )
 
     print(self.model)
