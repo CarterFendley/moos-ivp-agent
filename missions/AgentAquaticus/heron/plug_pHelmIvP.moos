@@ -1,8 +1,8 @@
 //---------------------------------------
 ProcessConfig = pHelmIvP
 {
-  AppTick    = 6
-  CommsTick  = 6
+  AppTick    = 2
+  CommsTick  = 2
   
   ok_skew      = any
   Behaviors    = targ_$(VNAME).bhv
