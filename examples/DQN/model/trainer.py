@@ -22,7 +22,7 @@ from DQN import DQN, ReplayMemory, Transition
 from agent import Agent
 from util.state import dist
 
-from config import EPISODES, BATCH_SIZE, TARGET_UPDATE, MEMORY_SIZE
+from config import EPISODES, BATCH_SIZE, HALF_BATCH_SIZE, TARGET_UPDATE, MEMORY_SIZE
 from config import GAMMA, LR
 from config import EPS_START, EPS_DECAY_AMT
 from config import REWARD_STEP, REWARD_SUCCESS, REWARD_FAILURE, REWARD_ACTION_CHANGE
@@ -95,7 +95,11 @@ def train(args, config):
   
   model = Agent(policy_net)
   optimizer = optim.Adam(policy_net.parameters(), lr=config['lr'])
-  memory = ReplayMemory(MEMORY_SIZE)
+  
+  memory = (
+    ReplayMemory(MEMORY_SIZE),
+    ReplayMemory(MEMORY_SIZE)
+  )
 
   if not args.no_wandb:
     wandb.watch(policy_net, log_freq=TRAIN_FOR)
@@ -199,7 +203,7 @@ def train(args, config):
             success_count += 1
           agent.episode_reward += reward
 
-          memory.push(
+          memory[agent.current_action].push(
             agent.last_state,
             agent.current_action,
             None,
@@ -237,7 +241,7 @@ def train(args, config):
             reward = config['reward_action_change']
             action_changes += 1
 
-          memory.push(
+          memory[agent.current_action].push(
             agent.last_state,
             agent.current_action,
             model_state,
@@ -284,11 +288,11 @@ def train(args, config):
       fit_bar = tqdm(total=TRAIN_FOR, desc='Fitting')
       tqdm.write(f'Batch size: {BATCH_SIZE}, Batches: {TRAIN_FOR}, Will Sample: {BATCH_SIZE*TRAIN_FOR}, Memory size: {len(memory)}')
       while batches < TRAIN_FOR:
-        if len(memory) < BATCH_SIZE:
+        if len(memory[0]) < HALF_BATCH_SIZE or len(memory[1]) < HALF_BATCH_SIZE:
           break
 
         # Get a batch
-        transitions = memory.sample(BATCH_SIZE)
+        transitions = memory[0].sample(HALF_BATCH_SIZE) + memory[1].sample(HALF_BATCH_SIZE)
         batch = Transition(*zip(*transitions)) # See Transition definition & https://stackoverflow.com/a/19343/3343043
 
         # Get V(s_{t+1}) expected value for next states
